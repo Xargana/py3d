@@ -1,6 +1,6 @@
 # this shit absoloutely sucks ass
 # but it works
-
+# so dont touch it
 
 import time
 import pygame
