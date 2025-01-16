@@ -35,6 +35,3 @@ To install the required dependencies, you can run:
 ```bash
 pip install pygame PyOpenGL Pillow
 
-
-
-yes, gpt wrote this
