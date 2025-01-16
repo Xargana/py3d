@@ -4,11 +4,11 @@ This is a simple OpenGL application that displays a textured cube. It supports f
 
 ## Hotkeys
 ### Frame Limiting:
-- `F` + `1`: Enable frame limiting at 1 FPS
-- `F` + `2`: Enable frame limiting at 2 FPS
-- `F` + `3`: Enable frame limiting at 3 FPS
-- `F` + `4`: Enable frame limiting at 4 FPS
-- `F` + `5`: Enable frame limiting at 5 FPS
+- `F` + `1`: Enable frame limiting at 24 FPS
+- `F` + `2`: Enable frame limiting at 30 FPS
+- `F` + `3`: Enable frame limiting at 60 FPS
+- `F` + `4`: Enable frame limiting at 144 FPS
+- `F` + `5`: Enable frame limiting at 165 FPS
 - `F` + `0`: Disable frame limiting
 
 ### Texture Switching:
