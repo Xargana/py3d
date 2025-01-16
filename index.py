@@ -88,7 +88,7 @@ def main():
     fps_display_timer = 0
     angle_x = 0.0  # Rotation around x-axis
     angle_y = 0.0  # Rotation around y-axis
-    rotation_speed_factor = 0.2  # Adjust this for mouse sensitivity
+    rotation_speed_factor = 0.1  # Adjust this for mouse sensitivity
 
     while True:
         keys = pygame.key.get_pressed()
@@ -104,22 +104,30 @@ def main():
                     angle_x += dy * rotation_speed_factor
                     angle_y += dx * rotation_speed_factor
 
-        # Check for frame rate toggles (F + 1, 2, 3, 4, 5, 0)
+        # i know the check for the key is a bit weird
         if keys[K_f]:
-            if keys[K_1]:
-                refresh_rate = 24
-            elif keys[K_2]:
-                refresh_rate = 30
-            elif keys[K_3]:
-                refresh_rate = 60
-            elif keys[K_4]:
-                refresh_rate = 144
-            elif keys[K_5]:
-                refresh_rate = 165
-            elif keys[K_0]:
-                refresh_rate = 0  # Unlimited
+            try:
+                if keys[K_1]:
+                    frame_limit = 1
+                    print(f"Frame limiting enabled. FPS: {refresh_rate}")
+                elif keys[K_2]:
+                    frame_limit = 2
+                    print(f"Frame limiting enabled. FPS: {refresh_rate}")
+                elif keys[K_3]:
+                    frame_limit = 3
+                    print(f"Frame limiting enabled. FPS: {refresh_rate}")
+                elif keys[K_4]:
+                    frame_limit = 4
+                    print(f"Frame limiting enabled. FPS: {refresh_rate}")
+                elif keys[K_5]:
+                    frame_limit = 5
+                    print(f"Frame limiting enabled. FPS: {refresh_rate}")
+                elif keys[K_0]:
+                    frame_limit = 0
+                    print(f"Frame limiting disabled.")
+            except ValueError:
+                print("Invalid frame limit. Using default.")
 
-        # Check for texture toggles (T + 1, 2, 3)
         if keys[K_t]:
             try:
                 if keys[K_1]:
@@ -135,18 +143,20 @@ def main():
                 print("Texture file not found. Using fallback texture.")
                 texture = load_texture("textures/missing.jpg")
 
-        # Check for anti-aliasing toggles (A + 1, 2, 3, 4, 0)
         if keys[K_a]:
-            if keys[K_1]:
-                anti_aliasing_samples = 2
-            elif keys[K_2]:
-                anti_aliasing_samples = 4
-            elif keys[K_3]:
-                anti_aliasing_samples = 8
-            elif keys[K_4]:
-                anti_aliasing_samples = 16
-            elif keys[K_0]:
-                anti_aliasing_samples = 0
+            try:
+                if keys[K_1]:
+                    anti_aliasing_samples = 2
+                elif keys[K_2]:
+                    anti_aliasing_samples = 4
+                elif keys[K_3]:
+                    anti_aliasing_samples = 8
+                elif keys[K_4]:
+                    anti_aliasing_samples = 16
+                elif keys[K_0]:
+                    anti_aliasing_samples = 0
+            except ValueError:
+                print("Invalid anti-aliasing level. Using default.")
 
             if anti_aliasing_samples > 0:
                 pygame.display.gl_set_attribute(GL_MULTISAMPLESAMPLES, anti_aliasing_samples)
