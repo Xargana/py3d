@@ -1,37 +1,81 @@
-# Cube Viewer with OpenGL and Pygame
+```markdown
+# 3D Object Viewer
 
-This is a simple OpenGL application that displays a textured cube. It supports frame limiting, texture switching, and anti-aliasing settings. The cube can be rotated using the mouse, and various settings can be adjusted in real time using keyboard hotkeys.
+## Overview
 
-## Hotkeys
-### Frame Limiting:
-- `F` + `1`: Enable frame limiting at 24 FPS
-- `F` + `2`: Enable frame limiting at 30 FPS
-- `F` + `3`: Enable frame limiting at 60 FPS
-- `F` + `4`: Enable frame limiting at 144 FPS
-- `F` + `5`: Enable frame limiting at 165 FPS
-- `F` + `0`: Disable frame limiting
-
-### Texture Switching:
-- `T` + `1`: Load texture 1
-- `T` + `2`: Load texture 2
-- `T` + `3`: Load texture 3
-
-### Anti-Aliasing:
-- `A` + `1`: Set anti-aliasing to 2x
-- `A` + `2`: Set anti-aliasing to 4x
-- `A` + `3`: Set anti-aliasing to 8x
-- `A` + `4`: Set anti-aliasing to 16x
-- `A` + `0`: Disable anti-aliasing
+This is a Python-based 3D object viewer built using **Pygame**, **PyOpenGL**, and **Pillow**. The application allows you to load and view 3D objects with textures, dynamically adjust rendering settings, and interact with the object using keyboard and mouse inputs.
 
 ## Requirements
-This project uses the following dependencies:
-- `pygame` - For creating the window and handling input.
-- `PyOpenGL` - For rendering the 3D cube.
-- `Pillow` - For loading textures.
 
-### Installing Dependencies
-To install the required dependencies, you can run:
+- Python 3.8 or higher
+- Dependencies:
+  - `pygame`
+  - `PyOpenGL`
+  - `numpy`
+  - `Pillow`
+
+Install dependencies via pip:
 
 ```bash
-pip install pygame PyOpenGL Pillow
+pip install pygame PyOpenGL numpy Pillow
+```
 
+## How to Use
+
+### Running the Program
+
+To start the viewer, run the script in a terminal:
+
+```bash
+python viewer.py [-o OBJECT_MODULE] [-t TEXTURE_FILE]
+```
+
+- `-o, --object`: Path to the 3D object module (Python file).
+- `-t, --texture`: Path to the texture file (e.g., `.jpg`, `.png`).
+
+### Example
+
+```bash
+python viewer.py -o objects.cube -t textures/1.jpg
+```
+
+If no object or texture is specified, a default cube and texture will be used.
+
+### Controls
+
+- **Mouse**:
+  - Drag (left button) to rotate the object.
+- **Keyboard**:
+  - Arrow keys: Rotate the object.
+  - `F` + `1-5`: Set frame rate limit.
+    - `F` + `0`: Disable frame rate limit.
+  - `T` + `1-3`: Load different textures (`textures/1.jpg`, `textures/2.jpg`, etc.).
+  - `A` + `1-4`: Set anti-aliasing (2x, 4x, 8x, 16x).
+    - `A` + `0`: Disable anti-aliasing.
+
+## Customization
+
+### Adding New Objects
+
+Create a Python module for your object with the following attributes:
+
+- `vertices`: List of vertex coordinates.
+- `faces`: List of faces, defined by indices into the `vertices` list.
+- `texture_coords`: Texture coordinates corresponding to each vertex.
+
+Save the module in the `objects` directory.
+
+### Adding New Textures
+
+Place texture files (`.jpg`) in the `textures` directory. Use the `-t` flag or `T` + `1-3` keys to switch textures.
+
+## License
+
+This project is open-source and available under the MIT License. Feel free to modify and distribute it.
+
+## Acknowledgments
+
+- **Pygame** for window management and input handling.
+- **PyOpenGL** for 3D rendering.
+- **Pillow** for texture image processing.
+```

@@ -1,66 +1,73 @@
-# this shit absoloutely sucks ass
-# but it works
-# so dont touch it
-
-import time
+import argparse
 import pygame
+import numpy # Don't remove, needed by pyopengl
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from PIL import Image
 
-# Define the vertices for the cube
-vertices = [
-    [-1, -1, -1],  # Bottom-back-left
-    [1, -1, -1],   # Bottom-back-right
-    [1, -1, 1],    # Bottom-front-right
-    [-1, -1, 1],   # Bottom-front-left
-    [-1, 1, -1],   # Top-back-left
-    [1, 1, -1],    # Top-back-right
-    [1, 1, 1],     # Top-front-right
-    [-1, 1, 1]     # Top-front-left
-]
 
-# Define the faces of the cube with corrected vertex orders
-faces = [
-    [0, 3, 2, 1],  # Bottom face (corrected winding)
-    [4, 5, 6, 7],  # Top face
-    [1, 0, 4, 5],  # Back face (corrected winding)
-    [2, 3, 7, 6],  # Front face
-    [1, 2, 6, 5],  # Right face
-    [0, 4, 7, 3]   # Left face (corrected winding)
-]
 
 def load_texture(image_path):
     texture = glGenTextures(1)
     glBindTexture(GL_TEXTURE_2D, texture)
 
     # Load image using PIL
-    image = Image.open(image_path)
-    image = image.transpose(Image.FLIP_TOP_BOTTOM)  # Flip the image vertically
-    img_data = image.convert("RGBA").tobytes()
+    with Image.open(image_path) as image:
+        image = image.transpose(Image.FLIP_TOP_BOTTOM)
+        img_data = image.convert("RGBA").tobytes()
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
 
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    # Change LINEAR to NEAREST for sharp textures
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
 
     return texture
 
-def draw_cube():
-    texture_coords = [
-        [0, 0], [1, 0], [1, 1], [0, 1] # Texture coordinates for each face
-    ]
-
-    glBegin(GL_QUADS)
+def draw_object(vertices, faces, texture_coords):
+    glBegin(GL_QUADS if len(faces[0]) == 4 else GL_TRIANGLES)
     for face in faces:
         for i, vertex in enumerate(face):
             glTexCoord2f(*texture_coords[i])  # Assign correct texture coordinate
             glVertex3fv(vertices[vertex])
     glEnd()
 
+
+
+def load_object_module(module_path):
+    """Dynamically load an object module from a module path"""
+    try:
+        import importlib
+
+        # Import the module using its module path
+        module = importlib.import_module(module_path)
+
+        return module.vertices, module.faces, module.texture_coords
+
+    except Exception as e:
+        print(f"Error loading object file: {e}")
+        # Load fallback cube data
+        from objects.cube import vertices, faces, texture_coords
+        return vertices, faces, texture_coords
+
+
 def main():
+    parser = argparse.ArgumentParser(description='3D Object Viewer')
+    parser.add_argument('-o', '--object', type=str, help='Path to object definition file')
+    parser.add_argument('-t', '--texture', type=str, help='Path to texture file')
+    args = parser.parse_args()
+
+    # Load object data - either from specified file or fallback to cube
+    if args.object:
+        vertices, faces, texture_coords = load_object_module(args.object)
+    else:
+        from objects.cube import vertices, faces, texture_coords
+
     pygame.init()
+
+    # Set the background color to light blue
+    glClearColor(0.5, 0.7, 1.0, 1.0)  # RGB values from 0.0 to 1.0, plus alpha
 
     # Request multisampling (anti-aliasing) settings
     pygame.display.gl_set_attribute(GL_MULTISAMPLEBUFFERS, 1)
@@ -76,11 +83,47 @@ def main():
     anti_aliasing_samples = 4  # Default anti-aliasing level
     glEnable(GL_MULTISAMPLE)
 
+    def is_visible(position, radius):
+        # Simple sphere-frustum intersection test
+        x, y, z = position
+        return abs(x) < radius and abs(y) < radius and -5 < z < -1
+    
+    def create_display_list(vertices, faces, texture_coords):
+        display_list = glGenLists(1)
+        glNewList(display_list, GL_COMPILE)
+        draw_object(vertices, faces, texture_coords)
+        glEndList()
+        return display_list
+    
+    display_list = create_display_list(vertices, faces, texture_coords)
+
+    def setup_vbo(vertices, faces):
+        # Create buffers
+        vbo = glGenBuffers(1)
+        ebo = glGenBuffers(1)
+    
+        # Bind vertex buffer
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        glBufferData(GL_ARRAY_BUFFER, numpy.array(vertices, dtype=numpy.float32), GL_STATIC_DRAW)
+    
+        # Bind element buffer
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, numpy.array(faces, dtype=numpy.uint32), GL_STATIC_DRAW)
+    
+        return vbo, ebo
+
+    vbo, ebo = setup_vbo(vertices, faces)
+
+
     try:
         texture = load_texture("textures/1.jpg")  # Use the provided texture file
     except FileNotFoundError:
         print("Texture file not found. Using fallback texture.")
         texture = load_texture("textures/missing.jpg")  # Fallback texture
+    finally:
+        if args.texture:
+            texturename = str("textures/" + args.texture)
+            texture = load_texture(texturename)
 
     clock = pygame.time.Clock()
     frame_limit = 6  # Start with frame limiting enabled
@@ -104,29 +147,36 @@ def main():
                     angle_x += dy * rotation_speed_factor
                     angle_y += dx * rotation_speed_factor
 
+        if keys[K_UP]:
+            angle_x += 1
+        if keys[K_DOWN]:
+            angle_x -= 1
+        if keys[K_LEFT]:
+            angle_y -= 1
+        if keys[K_RIGHT]:
+            angle_y += 1
+        
+
         # i know the check for the key is a bit weird
         if keys[K_f]:
-            try:
                 if keys[K_1]:
-                    frame_limit = 1
+                    refresh_rate = 10
                     print(f"Frame limiting enabled. FPS: {refresh_rate}")
                 elif keys[K_2]:
-                    frame_limit = 2
+                    refresh_rate = 30
                     print(f"Frame limiting enabled. FPS: {refresh_rate}")
                 elif keys[K_3]:
-                    frame_limit = 3
+                    refresh_rate = 60
                     print(f"Frame limiting enabled. FPS: {refresh_rate}")
                 elif keys[K_4]:
-                    frame_limit = 4
+                    refresh_rate = 144
                     print(f"Frame limiting enabled. FPS: {refresh_rate}")
                 elif keys[K_5]:
-                    frame_limit = 5
+                    refresh_rate = 165
                     print(f"Frame limiting enabled. FPS: {refresh_rate}")
                 elif keys[K_0]:
-                    frame_limit = 0
+                    refresh_rate = 0
                     print(f"Frame limiting disabled.")
-            except ValueError:
-                print("Invalid frame limit. Using default.")
 
         if keys[K_t]:
             try:
@@ -144,19 +194,16 @@ def main():
                 texture = load_texture("textures/missing.jpg")
 
         if keys[K_a]:
-            try:
-                if keys[K_1]:
-                    anti_aliasing_samples = 2
-                elif keys[K_2]:
-                    anti_aliasing_samples = 4
-                elif keys[K_3]:
-                    anti_aliasing_samples = 8
-                elif keys[K_4]:
-                    anti_aliasing_samples = 16
-                elif keys[K_0]:
-                    anti_aliasing_samples = 0
-            except ValueError:
-                print("Invalid anti-aliasing level. Using default.")
+            if keys[K_1]:
+                anti_aliasing_samples = 2
+            elif keys[K_2]:
+                anti_aliasing_samples = 4
+            elif keys[K_3]:
+                anti_aliasing_samples = 8
+            elif keys[K_4]:
+                anti_aliasing_samples = 16
+            elif keys[K_0]:
+                anti_aliasing_samples = 0
 
             if anti_aliasing_samples > 0:
                 pygame.display.gl_set_attribute(GL_MULTISAMPLESAMPLES, anti_aliasing_samples)
@@ -184,10 +231,12 @@ def main():
         glRotatef(angle_x, 1, 0, 0)
         glRotatef(angle_y, 0, 1, 0)
         glBindTexture(GL_TEXTURE_2D, texture)
-        draw_cube()
+        draw_object(vertices, faces, texture_coords)
+        if is_visible([0, 0, -5], 2.0):
+            glCallList(display_list)
         glPopMatrix()
 
         pygame.display.flip()
-
 if __name__ == "__main__":
     main()
+
