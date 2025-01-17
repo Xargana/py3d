@@ -28,7 +28,7 @@ pip install pygame PyOpenGL numpy Pillow
 To start the viewer, run the script in a terminal:
 
 ```bash
-python viewer.py [-o OBJECT_MODULE] [-t TEXTURE_FILE]
+python viewer.py [-o OBJECT_FILE] [-t TEXTURE_FILE]
 ```
 
 - `-o, --object`: Path to the 3D object module (Python file).
@@ -37,7 +37,7 @@ python viewer.py [-o OBJECT_MODULE] [-t TEXTURE_FILE]
 ### Example
 
 ```bash
-python viewer.py -o objects.cube -t textures/1.jpg
+python viewer.py -o cube -t 1.jpg
 ```
 
 If no object or texture is specified, a default cube and texture will be used.
@@ -53,6 +53,7 @@ If no object or texture is specified, a default cube and texture will be used.
   - `T` + `1-3`: Load different textures (`textures/1.jpg`, `textures/2.jpg`, etc.).
   - `A` + `1-4`: Set anti-aliasing (2x, 4x, 8x, 16x).
     - `A` + `0`: Disable anti-aliasing.
+  - `M` + `1-2`: Enable/Disable mipmapping
 
 ## Customization
 
@@ -68,7 +69,7 @@ Save the module in the `objects` directory.
 
 ### Adding New Textures
 
-Place texture files (`.jpg`) in the `textures` directory. Use the `-t` flag or `T` + `1-3` keys to switch textures.
+Place texture files (`.jpg`) in the `textures` directory. Use the `-t` flag to switch textures.
 
 ## License
 
