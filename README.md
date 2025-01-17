@@ -73,7 +73,7 @@ Place texture files (`.jpg`) in the `textures` directory. Use the `-t` flag to s
 
 ## License
 
-This project is open-source and available under the MIT License. Feel free to modify and distribute it.
+This project is open-source and available under the GNU-3.0 License. Feel free to modify and distribute it.
 
 ## Acknowledgments
 
