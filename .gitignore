@@ -2,4 +2,5 @@
 /dist
 /index.spec
 /py3d_venv
-/run.sh
+*.pyc
+

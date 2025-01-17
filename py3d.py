@@ -1,6 +1,6 @@
 import argparse
 import pygame
-import numpy # Don't remove, needed by pyopengl
+import numpy 
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -12,16 +12,18 @@ def load_texture(image_path):
     texture = glGenTextures(1)
     glBindTexture(GL_TEXTURE_2D, texture)
 
-    # Load image using PIL
     with Image.open(image_path) as image:
         image = image.transpose(Image.FLIP_TOP_BOTTOM)
         img_data = image.convert("RGBA").tobytes()
 
+    # Enable mipmapping
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
+    glGenerateMipmap(GL_TEXTURE_2D)
 
-    # Change LINEAR to NEAREST for sharp textures
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+    # Set texture filtering parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    
 
     return texture
 
@@ -33,6 +35,16 @@ def draw_object(vertices, faces, texture_coords):
             glVertex3fv(vertices[vertex])
     glEnd()
 
+def set_texture_quality(quality='high'):
+    quality_settings = {
+        'low': (GL_NEAREST, GL_NEAREST),
+        'medium': (GL_LINEAR, GL_LINEAR),
+        'high': (GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR)
+    }
+    
+    min_filter, mag_filter = quality_settings[quality]
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter)
 
 
 def load_object_module(module_path):
@@ -41,7 +53,8 @@ def load_object_module(module_path):
         import importlib
 
         # Import the module using its module path
-        module = importlib.import_module(module_path)
+        module_pathfull = str("objects." + module_path)
+        module = importlib.import_module(module_pathfull)
 
         return module.vertices, module.faces, module.texture_coords
 
@@ -73,8 +86,10 @@ def main():
     pygame.display.gl_set_attribute(GL_MULTISAMPLEBUFFERS, 1)
     pygame.display.gl_set_attribute(GL_MULTISAMPLESAMPLES, 4)  # Default to 4x multisampling
 
+    # Don't listen to your ide
     screen = pygame.display.set_mode((800, 600), OPENGL | RESIZABLE | DOUBLEBUF)
-    gluPerspective(45, (800 / 600), 0.1, 50.0)
+    # ^^^ this IS used, don't delete it
+    gluPerspective(60, (800 / 600), 0.1, 50.0)
     glTranslatef(0.0, 0.0, -5)
 
     glEnable(GL_TEXTURE_2D)
@@ -155,7 +170,18 @@ def main():
             angle_y -= 1
         if keys[K_RIGHT]:
             angle_y += 1
-        
+        if keys[K_SPACE]:
+            angle_x = 0
+            angle_y = 0
+
+
+        if keys[K_m]:  # 'Q' for texture quality
+            if keys[K_1]:
+                set_texture_quality('low')
+                print("Mipmapping disabled")
+            elif keys[K_2]:
+                set_texture_quality('high')
+                print("Mipmapping enabled")
 
         # i know the check for the key is a bit weird
         if keys[K_f]:
@@ -236,6 +262,7 @@ def main():
             glCallList(display_list)
         glPopMatrix()
 
+        pygame.display.set_caption(f"py3d gltest | FPS: {fps:.2f}")
         pygame.display.flip()
 if __name__ == "__main__":
     main()
