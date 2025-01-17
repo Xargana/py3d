@@ -1,4 +1,4 @@
-```markdown
+
 # 3D Object Viewer
 
 ## Overview
@@ -19,6 +19,7 @@ Install dependencies via pip:
 ```bash
 pip install pygame PyOpenGL numpy Pillow
 ```
+
 
 ## How to Use
 
@@ -78,4 +79,3 @@ This project is open-source and available under the MIT License. Feel free to mo
 - **Pygame** for window management and input handling.
 - **PyOpenGL** for 3D rendering.
 - **Pillow** for texture image processing.
-```
