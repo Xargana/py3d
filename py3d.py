@@ -1,14 +1,25 @@
 import argparse
 import pygame
+import pygame.font
 import numpy 
 from pygame.locals import *
+from pygame import HWSURFACE, DOUBLEBUF
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from PIL import Image
 
+loaded_textures = []
+mm = "on"
 
-
-def load_texture(image_path):
+def load_texture(image_path, old_texture=None):
+    global loaded_textures
+    
+    # Delete the old texture if it exists
+    if old_texture:
+        glDeleteTextures(1, [old_texture])
+        loaded_textures.remove(old_texture)  # Remove from tracking list
+    
+    # Generate new texture
     texture = glGenTextures(1)
     glBindTexture(GL_TEXTURE_2D, texture)
 
@@ -16,14 +27,14 @@ def load_texture(image_path):
         image = image.transpose(Image.FLIP_TOP_BOTTOM)
         img_data = image.convert("RGBA").tobytes()
 
-    # Enable mipmapping
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
     glGenerateMipmap(GL_TEXTURE_2D)
 
-    # Set texture filtering parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-    
+
+    # Track the new texture
+    loaded_textures.append(texture)
 
     return texture
 
@@ -46,6 +57,8 @@ def set_texture_quality(quality='high'):
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter)
 
+    return min_filter
+
 
 def load_object_module(module_path):
     """Dynamically load an object module from a module path"""
@@ -64,12 +77,101 @@ def load_object_module(module_path):
         from objects.cube import vertices, faces, texture_coords
         return vertices, faces, texture_coords
 
+def draw_overlay(font, window_size, fps, angle_x, angle_y, anti_aliasing_samples, texture, wireframe_mode, mm):
+    # Create an overlay surface at a fixed "virtual" resolution
+    virtual_size = (300, 600)
+    overlay_surface = pygame.Surface(virtual_size, pygame.SRCALPHA)
+    # Optional: fill with a semi-transparent background
+    overlay_surface.fill((0, 0, 0, 128))
+
+    if anti_aliasing_samples > 1:
+        aa = f"{anti_aliasing_samples}x"
+    else:
+        aa = "Off"
+    
+    if wireframe_mode == True:
+        wf_mode = "Wireframe"
+    elif wireframe_mode == False:
+        wf_mode = "Solid"
+
+
+    # Render your overlay text
+    lines = [
+        f"FPS: {fps:.2f}",
+        f"Angle X: {angle_x:.2f}",
+        f"Angle Y: {angle_y:.2f}",
+        f"Mode: {wf_mode}",
+        f"Anti-Aliasing: {aa}",
+        f"Texture: {texture}",
+        f"Mipmapping: {mm}"
+        # Add more info lines here if needed.
+    ]
+    y = 10
+    for line in lines:
+        text_surface = font.render(line, True, (255, 255, 255))
+        overlay_surface.blit(text_surface, (10, y))
+        y += text_surface.get_height() + 5
+
+    # Scale overlay to a portion of the window (e.g., right third)
+    scaled_width = window_size[0] // 3
+    scaled_height = window_size[1]
+    scaled_overlay = pygame.transform.smoothscale(overlay_surface, (scaled_width, scaled_height))
+
+    # Convert the scaled surface to a texture
+    overlay_data = pygame.image.tostring(scaled_overlay, "RGBA", True)
+    tex_id = glGenTextures(1)
+    glBindTexture(GL_TEXTURE_2D, tex_id)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, scaled_width, scaled_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, overlay_data)
+
+    # Set up orthographic projection so we can draw in 2D
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    glOrtho(0, window_size[0], window_size[1], 0, -1, 1)
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+
+    # Enable blending for transparency
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+    glEnable(GL_TEXTURE_2D)
+
+    # Draw a quad for the overlay on the right side of the window
+    x_pos = 0 
+    y_pos = 0  # Top
+    glBegin(GL_QUADS)
+    glTexCoord2f(0, 1); glVertex2f(x_pos, y_pos)  
+    glTexCoord2f(1, 1); glVertex2f(x_pos + scaled_width, y_pos)
+    glTexCoord2f(1, 0); glVertex2f(x_pos + scaled_width, y_pos + scaled_height)
+    glTexCoord2f(0, 0); glVertex2f(x_pos, y_pos + scaled_height)
+    glEnd()
+
+    glDisable(GL_TEXTURE_2D)
+    glDisable(GL_BLEND)
+
+    # Restore matrices
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+
+    # Clean up: delete the texture to avoid memory buildup
+
+
+
+
 
 def main():
     parser = argparse.ArgumentParser(description='3D Object Viewer')
     parser.add_argument('-o', '--object', type=str, help='Path to object definition file')
     parser.add_argument('-t', '--texture', type=str, help='Path to texture file')
     args = parser.parse_args()
+    wireframe_mode = False
+    mm = "on"
+
 
     # Load object data - either from specified file or fallback to cube
     if args.object:
@@ -77,10 +179,10 @@ def main():
     else:
         from objects.cube import vertices, faces, texture_coords
 
+
     pygame.init()
 
-    # Set the background color to light blue
-    glClearColor(0.5, 0.7, 1.0, 1.0)  # RGB values from 0.0 to 1.0, plus alpha
+    font = pygame.font.Font(None, 36)
 
     # Request multisampling (anti-aliasing) settings
     pygame.display.gl_set_attribute(GL_MULTISAMPLEBUFFERS, 1)
@@ -148,6 +250,7 @@ def main():
     angle_y = 0.0  # Rotation around y-axis
     rotation_speed_factor = 0.1  # Adjust this for mouse sensitivity
 
+    # while true my beloved :3
     while True:
         keys = pygame.key.get_pressed()
 
@@ -161,6 +264,13 @@ def main():
                     dx, dy = event.rel
                     angle_x += dy * rotation_speed_factor
                     angle_y += dx * rotation_speed_factor
+            
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_w:
+                    wireframe_mode = not wireframe_mode
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE if wireframe_mode else GL_FILL)
+                    print(f"Wireframe mode: {'enabled' if wireframe_mode else 'disabled'}")                  
 
         if keys[K_UP]:
             angle_x += 1
@@ -178,9 +288,11 @@ def main():
         if keys[K_m]:  # 'Q' for texture quality
             if keys[K_1]:
                 set_texture_quality('low')
+                mm = "off"
                 print("Mipmapping disabled")
             elif keys[K_2]:
                 set_texture_quality('high')
+                mm = "on"
                 print("Mipmapping enabled")
 
         # i know the check for the key is a bit weird
@@ -195,6 +307,8 @@ def main():
                     refresh_rate = 60
                     print(f"Frame limiting enabled. FPS: {refresh_rate}")
                 elif keys[K_4]:
+                    # this weirdly sets it to 165 fps
+                    # maybe it enables vsync?
                     refresh_rate = 144
                     print(f"Frame limiting enabled. FPS: {refresh_rate}")
                 elif keys[K_5]:
@@ -204,20 +318,31 @@ def main():
                     refresh_rate = 0
                     print(f"Frame limiting disabled.")
 
+        # fix later
+
         if keys[K_t]:
             try:
                 if keys[K_1]:
                     texture = load_texture("textures/1.jpg")
+                    glGenerateMipmap(GL_TEXTURE_2D)
                     print(f"Texture 1 loaded.")
-                elif keys[K_2]:
+                if keys[K_2]:
                     texture = load_texture("textures/2.jpg")
+                    glGenerateMipmap(GL_TEXTURE_2D)
                     print(f"Texture 2 loaded.")
-                elif keys[K_3]:
+                if keys[K_3]:
                     texture = load_texture("textures/3.jpg")
+                    glGenerateMipmap(GL_TEXTURE_2D)
                     print(f"Texture 3 loaded.")
+                if keys[K_4]:
+                    texture = load_texture("textures/white.jpg")
+                    glGenerateMipmap(GL_TEXTURE_2D)
+                    print(f"Texture 4 loaded.")
             except FileNotFoundError:
                 print("Texture file not found. Using fallback texture.")
                 texture = load_texture("textures/missing.jpg")
+            except Exception as e:
+                print(f"An error occurred while loading the texture: {e}")
 
         if keys[K_a]:
             if keys[K_1]:
@@ -238,8 +363,13 @@ def main():
             else:
                 glDisable(GL_MULTISAMPLE)
                 print("Anti-aliasing disabled.")
+                
+
+
+
 
         # Frame limiting logic
+        # just realised how bad this is
         if frame_limit:
             delta_time = clock.tick(refresh_rate) / 1000.0 if refresh_rate else clock.tick() / 1000.0
         else:
@@ -257,13 +387,28 @@ def main():
         glRotatef(angle_x, 1, 0, 0)
         glRotatef(angle_y, 0, 1, 0)
         glBindTexture(GL_TEXTURE_2D, texture)
+        glEnable(GL_TEXTURE_2D)
+        glBindTexture(GL_TEXTURE_2D, texture)
         draw_object(vertices, faces, texture_coords)
         if is_visible([0, 0, -5], 2.0):
             glCallList(display_list)
         glPopMatrix()
 
-        pygame.display.set_caption(f"py3d gltest | FPS: {fps:.2f}")
+        if wireframe_mode == True:
+            pygame.display.set_caption(f"py3d | mode: wireframe | FPS: {fps:.2f} ")
+        else:
+            pygame.display.set_caption(f"py3d | mode: solid | FPS: {fps:.2f} ")
+
+        window_size = pygame.display.get_surface().get_size()
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+        draw_overlay(font, window_size, fps, angle_x, angle_y, anti_aliasing_samples, texture, wireframe_mode, mm)
+        glBindTexture(GL_TEXTURE_2D, texture)
+        if wireframe_mode == True:
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+
         pygame.display.flip()
+
+        
 if __name__ == "__main__":
     main()
 
