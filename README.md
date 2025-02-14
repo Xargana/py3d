@@ -50,11 +50,13 @@ If no object or texture is specified, a default cube and texture will be used.
   - Arrow keys: Rotate the object.
   - `F` + `1-5`: Set frame rate limit.
     - `F` + `0`: Disable frame rate limit.
-  - `T` + `1-3`: Load different textures (`textures/1.jpg`, `textures/2.jpg`, etc.).
+  - `T` + `1-3`: Load preset textures.
   - `A` + `1-4`: Set anti-aliasing (2x, 4x, 8x, 16x).
     - `A` + `0`: Disable anti-aliasing.
-  - `M` + `1-2`: Enable/Disable mipmapping
-
+  - `M` : Enable/Disable mipmapping
+  - `W` : Enable/Disable wireframe mode.	
+  - `SPACE`: Reset camera position.
+  - `RETURN`: Toggle between perspective and orthographic projection.
 ## Customization
 
 ### Adding New Objects
@@ -69,14 +71,9 @@ Save the module in the `objects` directory.
 
 ### Adding New Textures
 
-Place texture files (`.jpg`) in the `textures` directory. Use the `-t` flag to switch textures.
+Place texture files (`.jpg, .png`) in the `textures` directory. Use the `-t` flag to use the new textures.
 
 ## License
 
 This project is open-source and available under the GNU-3.0 License. Feel free to modify and distribute it.
 
-## Acknowledgments
-
-- **Pygame** for window management and input handling.
-- **PyOpenGL** for 3D rendering.
-- **Pillow** for texture image processing.

@@ -13,8 +13,10 @@ from PIL import Image
 
 loaded_textures = []
 command_queue = queue.Queue()
-mm = "on"
+prev_tex_id = None  # Store the previous texture globally
 
+
+# Will probably remove this, easily causes a memory leak
 def console_input():
     try:
         while True:
@@ -62,20 +64,6 @@ def draw_object(vertices, faces, texture_coords):
             glVertex3fv(vertices[vertex])
     glEnd()
 
-def set_texture_quality(quality='high'):
-    quality_settings = {
-        'low': (GL_NEAREST, GL_NEAREST),
-        'medium': (GL_LINEAR, GL_LINEAR),
-        'high': (GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR)
-    }
-    
-    min_filter, mag_filter = quality_settings[quality]
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter)
-
-    return min_filter
-
-
 def load_object_module(module_path):
     """Dynamically load an object module from a module path"""
     try:
@@ -93,57 +81,60 @@ def load_object_module(module_path):
         from objects.cube import vertices, faces, texture_coords
         return vertices, faces, texture_coords
 
-def draw_overlay(font, window_size, fps, angle_x, angle_y, anti_aliasing_samples, texture, wireframe_mode, mm, delta_time, fov, refresh_rate):
+def draw_overlay(font, window_size, fps, angle_x, angle_y, anti_aliasing_samples, texture, wireframe_mode, mm, delta_time, fov, refresh_rate, view_mode):
+    global prev_tex_id  # Reference the previous texture
+
+    if prev_tex_id is not None:
+        glDeleteTextures([prev_tex_id])  # Delete the old texture before creating a new one
+
     # Create an overlay surface at a fixed "virtual" resolution
-    virtual_size = (240, 290)
+    virtual_size = (280, 310)
     overlay_surface = pygame.Surface(virtual_size, pygame.SRCALPHA)
-    # Optional: fill with a semi-transparent background
-    overlay_surface.fill((0, 0, 0, 128))
+    overlay_surface.fill((0, 0, 0, 128))  # Optional: semi-transparent background
 
-    if anti_aliasing_samples > 1:
-        aa = f"{anti_aliasing_samples}x"
-    else:
-        aa = "Off"
-    
-    if wireframe_mode == True:
-        wf_mode = "Wireframe"
-    elif wireframe_mode == False:
-        wf_mode = "Solid"
+    # Anti-aliasing and wireframe mode text
+    aa = f"{anti_aliasing_samples}x" if anti_aliasing_samples > 1 else "Off"
+    wf_mode = "Wireframe" if wireframe_mode else "Solid"
 
-
-    # Render your overlay text
+    # Overlay text
     lines = [
         f"FPS: {fps:.1f}/{refresh_rate}",
         f"Angle X: {angle_x:.2f}",
         f"Angle Y: {angle_y:.2f}",
+        f"Fov: {fov}",
         f"Mode: {wf_mode}",
         f"Anti-Aliasing: {aa}",
         f"Texture: {texture}",
         f"Mipmapping: {mm}",
         f"Delta Time: {delta_time:.3f}",
-        f"Fov: {fov}"
-        # Add more lines here if needed.
+        f"View mode: {view_mode}",
+        f"tex_debug: {prev_tex_id}"  # Debug previous texture ID
     ]
+
+    # Render text
     y = 10
     for line in lines:
         text_surface = font.render(line, True, (255, 255, 255))
         overlay_surface.blit(text_surface, (10, y))
         y += text_surface.get_height() + 5
 
-    # Scale overlay to a portion of the window (e.g., right third)
-    scaled_width = window_size[0] // 4
-    scaled_height = window_size[1] // 2.4
+    # Scale overlay
+    scaled_width = window_size[0] // 3.6
+    scaled_height = window_size[1] // 2.2
     scaled_overlay = pygame.transform.smoothscale(overlay_surface, (scaled_width, scaled_height))
 
     # Convert the scaled surface to a texture
     overlay_data = pygame.image.tostring(scaled_overlay, "RGBA", True)
-    tex_id = glGenTextures(1)
+    tex_id = glGenTextures(1)  # Generate new texture
     glBindTexture(GL_TEXTURE_2D, tex_id)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, scaled_width, scaled_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, overlay_data)
 
-    # Set up orthographic projection so we can draw in 2D
+    # Store the current texture for next frame deletion
+    prev_tex_id = tex_id  
+
+    # Setup orthographic projection
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
@@ -152,21 +143,22 @@ def draw_overlay(font, window_size, fps, angle_x, angle_y, anti_aliasing_samples
     glPushMatrix()
     glLoadIdentity()
 
-    # Enable blending for transparency
+    # Enable blending and texture for overlay
     glEnable(GL_BLEND)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
     glEnable(GL_TEXTURE_2D)
 
-    # Draw a quad for the overlay on the right side of the window
-    x_pos = 0 
-    y_pos = 0  # Top
+    # Draw overlay quad
+    x_pos = 0
+    y_pos = 0  # Top-left corner
     glBegin(GL_QUADS)
-    glTexCoord2f(0, 1); glVertex2f(x_pos, y_pos)  
+    glTexCoord2f(0, 1); glVertex2f(x_pos, y_pos)
     glTexCoord2f(1, 1); glVertex2f(x_pos + scaled_width, y_pos)
     glTexCoord2f(1, 0); glVertex2f(x_pos + scaled_width, y_pos + scaled_height)
     glTexCoord2f(0, 0); glVertex2f(x_pos, y_pos + scaled_height)
     glEnd()
 
+    # Cleanup
     glDisable(GL_TEXTURE_2D)
     glDisable(GL_BLEND)
 
@@ -176,8 +168,7 @@ def draw_overlay(font, window_size, fps, angle_x, angle_y, anti_aliasing_samples
     glPopMatrix()
     glMatrixMode(GL_MODELVIEW)
 
-    # Clean up: delete the texture to avoid memory buildup
-    glDeleteTextures(1, [tex_id])
+    glBindTexture(GL_TEXTURE_2D, 0)  # Unbind texture
 
 # todo:
 
@@ -216,6 +207,45 @@ def load_missing_texture():
     
     return texture
 
+def set_projection(mode):
+    glMatrixMode(GL_PROJECTION)
+    glLoadIdentity()
+    
+    if mode == 0:  # Perspective Projection
+        gluPerspective(60, 1024 / 768, 0.1, 50.0)
+
+    elif mode == 1:  # Orthographic Projection
+        glOrtho(-2.0, 2.0, -2.0, 2.0, 0.1, 50.0)
+
+    elif mode == 2:  # Isometric Projection
+        glOrtho(-2.0, 2.0, -2.0, 2.0, 0.1, 50.0)
+        glRotatef(35.26, 1, 0, 0)  # Tilt downwards
+        glRotatef(45, 0, 1, 0)  # Rotate for isometric effect
+
+    elif mode == 3:  # Oblique Projection
+        glOrtho(-2.0, 2.0, -2.0, 2.0, 0.1, 50.0)
+        shear_matrix = np.array([
+            [1, 0.5, 0, 0],  # Shear X
+            [0, 1, 0, 0],  # No shear Y
+            [0, 0, 1, 0],  
+            [0, 0, 0, 1]
+        ], dtype=np.float32)
+        glMultMatrixf(shear_matrix.flatten())  # Apply oblique shear
+
+    elif mode == 4:  # Fisheye-Like Projection (Extreme Perspective)
+        glFrustum(-1, 1, -1, 1, 0.1, 50.0)  # Wide frustum for distortion
+        glTranslatef(0, 0, -2)  # Pull back slightly
+    
+    glMatrixMode(GL_MODELVIEW)
+    glLoadIdentity()
+
+def cleanup():
+    global loaded_textures
+    for tex in loaded_textures:
+        glDeleteTextures(1, [tex])
+    loaded_textures.clear()
+    if prev_tex_id:
+        glDeleteTextures(1, [prev_tex_id])
 
 def main():
     try:
@@ -223,8 +253,14 @@ def main():
         parser.add_argument('-o', '--object', type=str, help='Path to object definition file')
         parser.add_argument('-t', '--texture', type=str, help='Path to texture file')
         args = parser.parse_args()
+        projection_mode = 0  # 0 = Perspective, 1 = Ortho, 2 = Isometric, 3 = Oblique, 4 = Fisheye
         wireframe_mode = False
         mm = "on"
+        view_mode = "Perspective"
+        mipmapping = False
+
+
+        
         
 
 
@@ -302,7 +338,7 @@ def main():
             load_missing_texture()  # Fallback texture
         clock = pygame.time.Clock()
         frame_limit = 6  # Start with frame limiting enabled
-        refresh_rate = 60  # Target FPS
+        refresh_rate = 165  # Target FPS
         fps_display_timer = 0
         angle_x = 0.0  # Rotation around x-axis
         angle_y = 0.0  # Rotation around y-axis
@@ -317,6 +353,7 @@ def main():
             while not command_queue.empty():
                 command = command_queue.get()
                 if command == "exit":
+                    cleanup()
                     pygame.quit()
                     quit()
                 elif command.startswith("texture "):
@@ -326,6 +363,7 @@ def main():
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    cleanup()
                     pygame.quit()
                     quit()
 
@@ -352,8 +390,38 @@ def main():
                         glLoadIdentity()  # Reset matrix to apply changes
                         gluPerspective(fov, (1024 / 768), 0.1, 50.0)  # Update perspective
                         glTranslatef(0.0, 0.0, -5)
-                                  
 
+                if event.type == pygame.KEYDOWN:
+                    if event.key == K_RETURN:
+                        projection_mode = (projection_mode + 1) % 5  # Cycle through projections
+                        set_projection(projection_mode)
+                        if projection_mode == 0 :
+                            view_mode = "Perspective"
+                        elif projection_mode == 1 :
+                            view_mode = "Orthographic"
+                        elif projection_mode == 2 :
+                            view_mode = "Isometric"
+                        elif projection_mode == 3 :
+                            view_mode = "Oblique"
+                        elif projection_mode == 4 :
+                            view_mode = "Fisheye"
+
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_m:
+                        mipmapping = not mipmapping
+                        if mipmapping:
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
+                            mm = "On"
+                        else:
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+                            mm = "Off"
+                
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_e:
+                        print("\nExiting...")
+                        pygame.quit()
+                        quit()
+                                  
             if keys[K_UP]:
                 angle_x += 1.5 * 100 * delta_time
             if keys[K_DOWN]:
@@ -365,15 +433,6 @@ def main():
             if keys[K_SPACE]:
                 angle_x = 0
                 angle_y = 0
-
-
-            if keys[K_m]:  # 'Q' for texture quality
-                if keys[K_1]:
-                    set_texture_quality('low')
-                    mm = "off"
-                elif keys[K_2]:
-                    set_texture_quality('high')
-                    mm = "on"
 
             # i know the check for the key is a bit weird
             if keys[K_f]:
@@ -450,8 +509,6 @@ def main():
             #    print(f"FPS: {fps:.2f}")
                 fps_display_timer = 0
 
-            console_thread = threading.Thread(target=console_input, daemon=True)
-            console_thread.start()
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             glPushMatrix()
@@ -472,7 +529,7 @@ def main():
 
             window_size = pygame.display.get_surface().get_size()
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-            draw_overlay(font, window_size, fps, angle_x, angle_y, anti_aliasing_samples, texture, wireframe_mode, mm, delta_time, fov, refresh_rate)
+            draw_overlay(font, window_size, fps, angle_x, angle_y, anti_aliasing_samples, texture, wireframe_mode, mm, delta_time, fov, refresh_rate, view_mode)
             glBindTexture(GL_TEXTURE_2D, texture)
             if wireframe_mode == True:
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
@@ -480,9 +537,20 @@ def main():
             pygame.display.flip()
     except KeyboardInterrupt:
         print(f"\nRecieved keyboard interrupt. Exiting...")
+        cleanup()
         print(f"please wait while the program cleans the leaked memory")
         pygame.quit()
         quit()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        print(f"Renderer: {glGetString(GL_RENDERER).decode()}")
+        print(f"Vendor: {glGetString(GL_VENDOR).decode()}")
+        print(f"Version: {glGetString(GL_VERSION).decode()}")
+        cleanup()
+        pygame.quit()
+        quit()
+
         
 if __name__ == "__main__":
     main()
+    
