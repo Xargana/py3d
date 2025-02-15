@@ -38,8 +38,8 @@ def generate_sphere(radius=1.0, lat_divisions=20, long_divisions=20):
 
 # Generate the sphere with desired parameters
 radius = 1.0
-lat_divisions = 50
-long_divisions = 50
+lat_divisions = 20
+long_divisions = 20
 
 # Directly assign the returned values
 vertices, faces, texture_coords = generate_sphere(radius, lat_divisions, long_divisions)

@@ -258,10 +258,16 @@ def main():
         mm = "on"
         view_mode = "Perspective"
         mipmapping = False
-
-
-        
-        
+        camera_distance = -5 
+        clock = pygame.time.Clock()
+        frame_limit = 6  # Start with frame limiting enabled
+        refresh_rate = 165  # Target FPS
+        fps_display_timer = 0
+        angle_x = 0.0  # Rotation around x-axis
+        angle_y = 180.0  # Rotation around y-axis
+        rotation_speed_factor = 0.1  # Adjust this for mouse sensitivity
+        width = 1024
+        height = 768
 
 
         # Load object data - either from specified file or fallback to cube
@@ -283,7 +289,7 @@ def main():
         # ^^^ this IS used, don't delete it
         fov = 40
         gluPerspective(fov, (1024 / 768), 0.1, 50.0)
-        glTranslatef(0.0, 0.0, -5)
+        glTranslatef(0.0, 0.0, camera_distance)
 
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_DEPTH_TEST)
@@ -336,18 +342,21 @@ def main():
         except FileNotFoundError:
             print("Texture file not found. Using fallback texture.")
             load_missing_texture()  # Fallback texture
-        clock = pygame.time.Clock()
-        frame_limit = 6  # Start with frame limiting enabled
-        refresh_rate = 165  # Target FPS
-        fps_display_timer = 0
-        angle_x = 0.0  # Rotation around x-axis
-        angle_y = 0.0  # Rotation around y-axis
-        rotation_speed_factor = 0.1  # Adjust this for mouse sensitivity
+
 
         # while true my beloved :3
         while True:
             keys = pygame.key.get_pressed()
             glClearColor(0.13, 0.17, 0.23, 1.0)  # RGB for sky-blue
+
+            if angle_x > 360:
+                angle_x = 0
+            if angle_y > 360:
+                angle_y = 0
+            if angle_x < 0:
+                angle_x = 360
+            if angle_y < 0:
+                angle_y = 360
 
             # Process commands
             while not command_queue.empty():
@@ -366,6 +375,21 @@ def main():
                     cleanup()
                     pygame.quit()
                     quit()
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        cleanup()
+                        pygame.quit()
+                        quit()
+
+                if event.type == pygame.VIDEORESIZE:
+                    width, height = event.size
+                    glViewport(0, 0, width, height)
+                    glMatrixMode(GL_PROJECTION)
+                    glLoadIdentity()
+                    gluPerspective(fov, width / height, 0.1, 50.0)
+                    glMatrixMode(GL_MODELVIEW)
+                    glLoadIdentity()
+                    glTranslatef(0.0, 0.0, camera_distance)
 
                 if event.type == pygame.MOUSEMOTION:
                     if event.buttons[0]:  # Left mouse button is pressed
@@ -421,18 +445,44 @@ def main():
                         print("\nExiting...")
                         pygame.quit()
                         quit()
-                                  
+
+            if keys[K_PAGEDOWN]:
+                glTranslatef(0.0, 0.0, -0.1 * 100 * delta_time)
+            if keys[K_PAGEUP]:
+                glTranslatef(0.0, 0.0, 0.1 * 100 * delta_time)
+            if keys[K_KP2]:
+                glTranslatef(0.0, 0.1 * 100 * delta_time, 0.0)
+            if keys[K_KP8]:
+                glTranslatef(0.0, -0.1 * 100 * delta_time, 0.0)
+            if keys[K_KP6]:
+                glTranslatef(-0.1 * 100 * delta_time, 0.0, 0.0)
+            if keys[K_KP4]:
+                glTranslatef(0.1 * 100 * delta_time, 0.0, 0.0)
+
+            if keys[K_KP_PLUS]:
+                glScalef(1.1, 1.1, 1.1)
+            if keys[K_KP_MINUS]:
+                glScalef(0.9, 0.9, 0.9)
+
+
             if keys[K_UP]:
-                angle_x += 1.5 * 100 * delta_time
+                if angle_x < 90 or angle_x >= 270:
+                    angle_x = (angle_x + 1.5 * 100 * delta_time)
+                else:
+                    angle_x = 90  # Prevents crossing over
+
             if keys[K_DOWN]:
-                angle_x -= 1.5 * 100 * delta_time
-            if keys[K_LEFT]:
-                angle_y += 1.5 * 100 * delta_time
+                if angle_x > 0 and angle_x <= 90 or angle_x > 270:
+                    angle_x = (angle_x - 1.5 * 100 * delta_time)
+                else:
+                    angle_x = 270  # Prevents crossing over
+            if keys [K_LEFT]:
+                angle_y = (angle_y + 1.5 * 100 * delta_time) % 360
             if keys[K_RIGHT]:
-                angle_y -= 1.5 * 100 * delta_time
+                angle_y = (angle_y - 1.5 * 100 * delta_time) % 360
             if keys[K_SPACE]:
-                angle_x = 0
-                angle_y = 0
+                angle_x = 180
+                angle_y = 180
 
             # i know the check for the key is a bit weird
             if keys[K_f]:
